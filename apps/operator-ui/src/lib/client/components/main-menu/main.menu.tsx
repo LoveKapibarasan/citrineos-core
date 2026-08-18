@@ -16,6 +16,7 @@ import {
   MapPin,
   Receipt,
   Users,
+  Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -101,6 +102,20 @@ export const MainMenu = ({ activeSection }: MainMenuProps) => {
     },
   ];
 
+  // External link to the ops-tools app (payment DB CRUD, transaction export).
+  // URL comes from an env var rather than being hardcoded, so this keeps
+  // working if the ops-tools domain (or the whole CitrineOS-side deployment
+  // it points at) changes later — only the env var needs updating, not this
+  // component.
+  const opsToolsUrl = process.env.NEXT_PUBLIC_OPS_TOOLS_URL;
+  if (opsToolsUrl) {
+    mainMenuItems.push({
+      key: opsToolsUrl,
+      label: 'Ops Tools',
+      icon: <Wrench className={sidebarIconSize} />,
+    });
+  }
+
   return (
     <>
       <aside
@@ -119,24 +134,39 @@ export const MainMenu = ({ activeSection }: MainMenuProps) => {
         <nav className="flex-1 overflow-y-auto py-2">
           <ul className="space-y-1 px-3">
             {mainMenuItems.map((item) => {
-              const isActive = `/${activeSection}` === item.key;
+              const isExternal = item.key.startsWith('http');
+              const isActive = !isExternal && `/${activeSection}` === item.key;
+              const linkClassName = cn(
+                'flex items-center gap-3 px-3 py-3 rounded-md transition-colors text-sm',
+                'hover:bg-accent hover:text-accent-foreground',
+                isActive
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'text-muted-foreground',
+                collapsed && 'justify-center px-2',
+              );
               return (
                 <li key={item.key}>
-                  <Link
-                    href={item.key}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-3 rounded-md transition-colors text-sm',
-                      'hover:bg-accent hover:text-accent-foreground',
-                      isActive
-                        ? 'bg-accent text-accent-foreground font-medium'
-                        : 'text-muted-foreground',
-                      collapsed && 'justify-center px-2',
-                    )}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <span className="shrink-0">{item.icon}</span>
-                    {!collapsed && <span>{item.label}</span>}
-                  </Link>
+                  {isExternal ? (
+                    <a
+                      href={item.key}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={linkClassName}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <span className="shrink-0">{item.icon}</span>
+                      {!collapsed && <span>{item.label}</span>}
+                    </a>
+                  ) : (
+                    <Link
+                      href={item.key}
+                      className={linkClassName}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <span className="shrink-0">{item.icon}</span>
+                      {!collapsed && <span>{item.label}</span>}
+                    </Link>
+                  )}
                 </li>
               );
             })}
