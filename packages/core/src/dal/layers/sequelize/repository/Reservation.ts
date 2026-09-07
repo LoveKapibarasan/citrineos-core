@@ -38,8 +38,33 @@ export class SequelizeReservationRepository
   ): Promise<Reservation | undefined> {
     let evseDBId: number | null = null;
     if (reserveNowRequest.evseId) {
-      const [evse] = await this.evse.readAllByQuery(tenantId, {
+      /**
+       * Find *or create* the EvseType row.
+       *
+       * Reading alone made every ReserveNow that named an evseId fail on a
+       * bench where `EvseTypes` is empty. The station's EVSEs are in `Evses`
+       * -- written when the charger reports itself -- while nothing on that
+       * path writes an `EvseTypes` row, so the lookup could not succeed and
+       * the reservation was refused before it ever reached the charger:
+       *
+       *   ReserveNow -> "Reservation could not be stored for station: cp001."
+       *   SequelizeReservationRepository  Could not find evse with id 1
+       *
+       * An EvseType is the OCPP 2.0.1 EVSE *number*, not a piece of hardware
+       * -- `id` is the serial the charger uses and the unique index is
+       * (tenantId, id) where connectorId is null. So creating the row for a
+       * number the charger has just named is recording what it told us,
+       * which is what every other device-model row here does. Station
+       * scoping comes from the reservation's own ocppConnectionName.
+       *
+       * ai-charge/citrineos-payment#399
+       */
+      const [evse] = await this.evse.readOrCreateByQuery(tenantId, {
         where: {
+          id: reserveNowRequest.evseId,
+          connectorId: null,
+        },
+        defaults: {
           id: reserveNowRequest.evseId,
           connectorId: null,
         },
