@@ -49,6 +49,7 @@ import {
 } from '../metrics.js';
 import { UpgradeAuthenticationError } from './authenticator/errors/AuthenticationError.js';
 import type { IUpgradeError } from './authenticator/errors/IUpgradeError.js';
+import { reportRejection } from './marketplaceRejection.js';
 import { TlsCredentialManager } from './TlsCertificateManager.js';
 
 export class WebsocketNetworkConnection implements INetworkConnection {
@@ -376,7 +377,19 @@ export class WebsocketNetworkConnection implements INetworkConnection {
        * See {@link IUpgradeError.terminateConnection}
        **/
       error?.terminateConnection?.(socket) || this._terminateConnectionInternalError(socket);
-      this._logger.warn('Connection upgrade failed', error);
+      this._logger.warn('Connection upgrade failed', {
+        message: error?.message,
+        stack: error?.stack,
+      });
+      // The marketplace platform cannot see this any other way: the upgrade
+      // is refused before any subscription for the station is loaded, and an
+      // unknown identifier has no subscription at all. Fire and forget --
+      // see marketplaceRejection.ts.
+      void reportRejection(
+        getClientIdFromUrl(req.url as string),
+        error,
+        websocketServerConfig.securityProfile,
+      );
     }
   }
 
